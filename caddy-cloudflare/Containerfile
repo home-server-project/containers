@@ -1,0 +1,14 @@
+# Caddy with Cloudflare DNS module.
+#
+# Track the official Caddy major-version channel. Docker Hub is the source
+# of truth for both build and runtime images, avoiding release-tag races.
+
+FROM docker.io/library/caddy:2-builder AS builder
+
+RUN xcaddy build     --with github.com/caddy-dns/cloudflare
+
+FROM docker.io/library/caddy:2
+
+LABEL org.opencontainers.image.source="https://github.com/home-server-project/containers"       org.opencontainers.image.description="Caddy with Cloudflare DNS-01 support."
+
+COPY --from=builder /usr/bin/caddy /usr/bin/caddy
