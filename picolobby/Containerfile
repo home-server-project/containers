@@ -1,0 +1,33 @@
+# Build PicoLobby from a reviewed upstream source commit.
+# Upstream has no GitHub release; use its exact source revision.
+
+FROM docker.io/library/rust:1.96.0-alpine AS builder
+
+RUN apk add --no-cache git musl-dev
+
+ARG PICOLOBBY_COMMIT=8e952bd0624eb94d9b093f5af19128e32c19bbb2
+
+WORKDIR /src
+RUN git init . \
+    && git remote add origin https://github.com/nobuildersnotools/PicoLobby.git \
+    && git fetch --depth=1 origin "${PICOLOBBY_COMMIT}" \
+    && git checkout --detach FETCH_HEAD \
+    && test "$(git rev-parse HEAD)" = "${PICOLOBBY_COMMIT}" \
+    && cargo build --release --locked --bin pico_lobby \
+    && mkdir -p /runtime-config \
+    && chown 65532:65532 /runtime-config
+
+FROM gcr.io/distroless/static:nonroot
+
+LABEL org.opencontainers.image.source="https://github.com/home-server-project/containers" \
+      org.opencontainers.image.description="PicoLobby lightweight interactive Minecraft lobby"
+
+COPY --from=builder /src/target/release/pico_lobby /usr/local/bin/pico_lobby
+COPY --from=builder /src/LICENSE /usr/share/licenses/picolobby/LICENSE
+COPY --from=builder --chown=65532:65532 /runtime-config/ /config/
+
+WORKDIR /config
+USER 65532:65532
+
+EXPOSE 25565/tcp
+ENTRYPOINT ["/usr/local/bin/pico_lobby"]
